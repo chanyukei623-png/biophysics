@@ -24,6 +24,8 @@ Computes mean square displacement (MSD)
 
 Computes average cluster size over time
 
+ABP.png — animation of active particles
+
 msd_plot.png — mean square displacement vs time
 
 cluster_size.png — average cluster size vs time
