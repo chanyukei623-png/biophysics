@@ -1,87 +1,41 @@
-**Overview**
+# Active Brownian Particles (ABP) Simulation
 
-This project simulates Active Brownian Particles (ABPs) in a 2D periodic box. The goal is to study particle motion and collective behavior in simple active matter systems.
+This folder contains a Python simulation of **Active Brownian Particles (ABPs)** in 2D. The simulation models self-propelled particles moving in a confined box, interacting through simple repulsive forces, and exhibiting collective behavior.
 
-The simulation models:
+---
 
-Self-propulsion of particles along their orientations
+## **Overview**
 
-Short-range repulsive interactions (WCA potential)
+Active Brownian Particles are **self-propelled particles** that move in a medium and change direction due to rotational diffusion:
 
-Rotational diffusion of particle orientations
+- Each particle has a position `(x, y)` and an orientation angle `theta`.  
+- Particles move with a constant self-propulsion speed `v0`.  
+- Orientation changes due to **rotational noise**.  
+- Interactions are modeled with **short-range repulsion** to prevent overlap.  
 
-Periodic boundary conditions
+The simulation demonstrates **emerging collective phenomena** such as clustering, swarming, and active diffusion.
 
-Files
+---
 
-abp_simulation.py — main Python script that:
+## **Features**
 
-Runs the ABP simulation
+- 2D simulation of self-propelled particles  
+- Periodic boundary conditions  
+- Adjustable parameters:
+  - `N` → number of particles
+  - `v0` → self-propulsion speed
+  - `D_r` → rotational diffusion coefficient
+  - `dt` → time step
+  - `box_size` → size of the simulation box  
+- Real-time visualization using Matplotlib  
+- Optionally save animation as GIF
 
-Animates particle motion
+---
 
-Computes mean square displacement (MSD)
+## **Requirements**
 
-Computes average cluster size over time
-
-ABP.png — animation of active particles
-
-msd_plot.png — mean square displacement vs time
-
-cluster_size.png — average cluster size vs time
-
-**Requirements**
-
-Python 3.x
-
-Libraries: numpy, matplotlib, scipy
-
-**How to Run**
-
-Run the simulation:
-
-python abp_simulation.py
-
-
-The simulation will:
-
-Animate the particles in a 2D box
-
-Generate plots:
-
-MSD (msd_plot.png)
-
-Average cluster size (cluster_size.png)
-
-**Simulation Parameters**
-
-n_particles — Number of particles (default: 50)
-
-box_size — Size of the simulation box (default: 20.0)
-
-dt — Time step (default: 0.005)
-
-n_steps — Number of simulation steps (default: 5000)
-
-v0 — Self-propulsion speed (default: 0.3)
-
-Dr — Rotational diffusion constant (default: 0.1)
-
-sigma — Particle diameter (default: 1.0)
-
-epsilon — Strength of repulsive interaction (default: 1.0)
-
-You can modify these parameters at the top of the script to explore different regimes.
-
-**Features**
-
-2D ABP simulation with periodic boundaries
-
-Short-range repulsive forces using WCA potential
-
-Rotational diffusion of particle orientations
-
-Animation of particle dynamics
-
-MSD and cluster size analysis
-
+- Python 3.x  
+- Packages:
+  - `numpy`
+  - `matplotlib`
+  - `pillow` (for saving GIF animations)
