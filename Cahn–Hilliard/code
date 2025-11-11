@@ -1,0 +1,121 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+# Basic parameters
+n_particles = 50
+box_size = 20.0
+dt = 0.005
+n_steps = 5000
+
+v0 = 0.3          # propulsion speed
+Dr = 0.1          # rotational diffusion
+sigma = 1.0
+epsilon = 1.0
+rcut = 2**(1/6) * sigma
+
+np.random.seed(42)
+pos = np.random.rand(n_particles, 2) * box_size
+theta = np.random.rand(n_particles) * 2 * np.pi
+
+def pbc(r):
+    """Apply periodic boundary conditions."""
+    return r % box_size
+
+def forces(pos):
+    """Compute pairwise repulsive forces (WCA potential)."""
+    F = np.zeros_like(pos)
+    for i in range(n_particles):
+        for j in range(i+1, n_particles):
+            rij = pos[i] - pos[j]
+            rij -= box_size * np.round(rij / box_size)
+            dist = np.linalg.norm(rij)
+            if dist < rcut:
+                f = 48 * epsilon * ((sigma**12 / dist**13) - 0.5 * (sigma**6 / dist**7))
+                fij = f * (rij / dist)
+                F[i] += fij
+                F[j] -= fij
+    return F
+
+# Store frames for animation
+frames = []
+for step in range(n_steps):
+    F = forces(pos)
+    e = np.column_stack((np.cos(theta), np.sin(theta)))
+    pos += dt * (v0 * e + F)
+    pos = pbc(pos)
+
+    # rotational diffusion
+    theta += np.sqrt(2 * Dr * dt) * np.random.randn(n_particles)
+    theta %= 2 * np.pi
+
+    if step % 50 == 0:
+        frames.append(pos.copy())
+
+# Animate
+fig, ax = plt.subplots(figsize=(6,6))
+sc = ax.scatter(frames[0][:,0], frames[0][:,1], s=20, c='steelblue')
+ax.set_xlim(0, box_size)
+ax.set_ylim(0, box_size)
+ax.set_title("Active Brownian Particles")
+
+def update(frame):
+    sc.set_offsets(frame)
+    return sc,
+
+ani = FuncAnimation(fig, update, frames=frames, interval=50, blit=True)
+ani.save("ABP.gif", writer='pillow')
+plt.show()
+
+def compute_MSD(frames):
+    n_frames = len(frames)
+    N = frames[0].shape[0]
+    msd = np.zeros(n_frames)
+    
+    # use the first frame as reference
+    r0 = frames[0]
+    for i, frame in enumerate(frames):
+        dr = frame - r0
+        # apply periodic boundary correction
+        dr = dr - box_size * np.round(dr / box_size)
+        msd[i] = np.mean(np.sum(dr**2, axis=1))
+    return msd
+
+msd = compute_MSD(frames)
+
+# plot
+plt.figure()
+plt.plot(np.arange(len(msd))*dt*50, msd)  # dt*50 because frames are every 50 steps
+plt.xlabel("Time")
+plt.ylabel("MSD")
+plt.title("Mean Square Displacement of ABPs")
+plt.savefig("msd_plot.png", dpi=300)
+plt.show()
+
+from scipy.spatial.distance import pdist, squareform
+
+def average_cluster_size(frame, cutoff=1.5):
+    dists = squareform(pdist(frame))
+    visited = set()
+    clusters = []
+
+    for i in range(len(frame)):
+        if i in visited:
+            continue
+        # find particles within cutoff
+        cluster = set(np.where(dists[i] < cutoff)[0])
+        visited |= cluster
+        clusters.append(len(cluster))
+    return np.mean(clusters)
+
+avg_sizes = [average_cluster_size(f) for f in frames]
+
+plt.figure()
+plt.plot(np.arange(len(avg_sizes))*dt*50, avg_sizes)
+plt.xlabel("Time")
+plt.ylabel("Average cluster size")
+plt.title("Clustering of ABPs over time")
+plt.savefig("cluster_size.png", dpi=300)
+plt.show()
+
+ani.save("abp_animation.mp4", writer="ffmpeg", fps=20)
