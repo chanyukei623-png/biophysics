@@ -1,0 +1,142 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import Slider, Button
+
+# -----------------------------
+# Default parameters
+# -----------------------------
+N = 20        # number of beads
+k = 50        # spring stiffness
+r0 = 1.0      # bond length
+D = 0.1       # noise
+dt = 0.01
+steps = 1000
+save_every = 5
+
+# -----------------------------
+# Initialize polymer chain
+# -----------------------------
+def init_chain(num_beads, bond_len):
+    pos = np.zeros((num_beads, 2))
+    for i in range(1, num_beads):
+        pos[i,0] = pos[i-1,0] + bond_len
+    return pos
+
+# -----------------------------
+# Simulation function
+# -----------------------------
+def simulate_chain(N, k, r0, D):
+    pos = init_chain(N, r0)
+    frames = []
+
+    for step in range(steps):
+        forces = np.zeros_like(pos)
+        # Bonded forces
+        for i in range(N-1):
+            delta = pos[i+1] - pos[i]
+            dist = np.linalg.norm(delta)
+            f = k * (dist - r0) * (delta / dist)
+            forces[i] += f
+            forces[i+1] -= f
+
+        # Brownian noise
+        noise = np.sqrt(2*D*dt) * np.random.randn(N,2)
+
+        # Update positions
+        pos += forces*dt + noise
+
+        if step % save_every == 0:
+            frames.append(pos.copy())
+    return frames
+
+# -----------------------------
+# Initial simulation
+# -----------------------------
+frames = simulate_chain(N, k, r0, D)
+
+# -----------------------------
+# Plot setup
+# -----------------------------
+fig, ax = plt.subplots(figsize=(6,6))
+plt.subplots_adjust(bottom=0.35)
+line, = ax.plot([], [], '-o', lw=2, color='teal')
+text_info = ax.text(0.02, 0.95, '', transform=ax.transAxes)
+
+ax.set_xlim(-5, N*r0 + 5)
+ax.set_ylim(-5, 5)
+ax.set_title("Polymer Chain (Bead-Spring)")
+
+def compute_stats(pos):
+    # End-to-End distance
+    R_e = np.linalg.norm(pos[-1] - pos[0])
+    # Radius of gyration
+    R_cm = np.mean(pos, axis=0)
+    R_g = np.sqrt(np.mean(np.sum((pos - R_cm)**2, axis=1)))
+    return R_e, R_g
+
+def update(frame):
+    line.set_data(frame[:,0], frame[:,1])
+    R_e, R_g = compute_stats(frame)
+    text_info.set_text(f'Re={R_e:.2f}, Rg={R_g:.2f}')
+    return line, text_info
+
+ani = FuncAnimation(fig, update, frames=frames, interval=50, blit=True)
+
+# -----------------------------
+# Sliders
+# -----------------------------
+axcolor = 'lightgoldenrodyellow'
+ax_k = plt.axes([0.25, 0.25, 0.65, 0.03], facecolor=axcolor)
+ax_D = plt.axes([0.25, 0.2, 0.65, 0.03], facecolor=axcolor)
+ax_N = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+
+slider_k = Slider(ax_k, 'k (stiffness)', 1, 200, valinit=k)
+slider_D = Slider(ax_D, 'D (noise)', 0.0, 1.0, valinit=D)
+slider_N = Slider(ax_N, 'N (beads)', 5, 50, valinit=N, valstep=1)
+
+# -----------------------------
+# Update k and D live
+# -----------------------------
+def update_params(val):
+    global frames
+    frames = simulate_chain(N, slider_k.val, r0, slider_D.val)
+    ani.event_source.stop()
+    ani.new_frame_seq()
+    ani.event_source.start()
+
+slider_k.on_changed(update_params)
+slider_D.on_changed(update_params)
+
+# -----------------------------
+# Re-run button for N
+# -----------------------------
+ax_button = plt.axes([0.8, 0.05, 0.1, 0.04])
+button = Button(ax_button, 'Re-run', color='lightblue', hovercolor='skyblue')
+
+def rerun(event):
+    global N, frames, line, ani
+    ani.event_source.stop()
+    ani._stop()
+
+    N = int(slider_N.val)
+    frames = simulate_chain(N, slider_k.val, r0, slider_D.val)
+    
+    ax.clear()
+    ax.set_xlim(-5, N*r0 + 5)
+    ax.set_ylim(-5, 5)
+    ax.set_title("Polymer Chain (Bead-Spring)")
+    
+    # Line and text
+    line, = ax.plot([], [], '-o', lw=2, color='teal')
+    global text_info
+    text_info = ax.text(0.02, 0.95, '', transform=ax.transAxes)
+    
+    ani = FuncAnimation(fig, update, frames=frames, interval=50, blit=True)
+    plt.draw()
+
+button.on_clicked(rerun)
+
+
+ani.save("polymer_chain.gif", writer='pillow', fps=30)
+plt.show()
