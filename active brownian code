@@ -64,6 +64,7 @@ def update(frame):
     return sc,
 
 ani = FuncAnimation(fig, update, frames=frames, interval=50, blit=True)
+ani.save("ABP.gif", writer='pillow')
 plt.show()
 
 def compute_MSD(frames):
