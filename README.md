@@ -1,4 +1,4 @@
-Overview
+**Overview**
 
 This project simulates Active Brownian Particles (ABPs) in a 2D periodic box. The goal is to study particle motion and collective behavior in simple active matter systems.
 
@@ -28,21 +28,13 @@ msd_plot.png — mean square displacement vs time
 
 cluster_size.png — average cluster size vs time
 
-Requirements
+**Requirements**
 
 Python 3.x
 
 Libraries: numpy, matplotlib, scipy
 
-Optional for saving animations:
-
-ffmpeg (for MP4)
-
-Install required libraries using pip:
-
-pip install numpy matplotlib scipy
-
-How to Run
+**How to Run**
 
 Run the simulation:
 
@@ -53,15 +45,13 @@ The simulation will:
 
 Animate the particles in a 2D box
 
-Save the animation as abp_animation.mp4
-
 Generate plots:
 
 MSD (msd_plot.png)
 
 Average cluster size (cluster_size.png)
 
-Simulation Parameters
+**Simulation Parameters**
 
 n_particles — Number of particles (default: 50)
 
@@ -81,7 +71,7 @@ epsilon — Strength of repulsive interaction (default: 1.0)
 
 You can modify these parameters at the top of the script to explore different regimes.
 
-Features
+**Features**
 
 2D ABP simulation with periodic boundaries
 
@@ -93,4 +83,3 @@ Animation of particle dynamics
 
 MSD and cluster size analysis
 
-Images and animations saved automatically
