@@ -1,0 +1,183 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import shutil
+
+# -----------------------------
+# Simulation parameters
+# -----------------------------
+N = 200           # number of rods
+L = 1.0           # rod length
+mu = 1.0          # dipole magnitude
+kT = 1.0
+steps = 5000      # total MC steps
+move_step = 0.1
+rot_step = 0.1
+wall_x = (0, 50)
+wall_y = (0, 50)
+cutoff = 5.0
+cell_size = 3.0
+
+# -----------------------------
+# Output movie
+# -----------------------------
+if shutil.which("ffmpeg"):
+    writer = animation.FFMpegWriter(fps=20)
+    save_filename = "nematic_simulation.mp4"
+else:
+    writer = animation.PillowWriter(fps=20)
+    save_filename = "nematic_simulation.gif"
+
+# -----------------------------
+# Initialize rods on grid to avoid overlap
+# -----------------------------
+def initialize_rods_grid(N, L, wall_x, wall_y):
+    nx = int(np.ceil(np.sqrt(N*(wall_x[1]-wall_x[0])/(wall_y[1]-wall_y[0]))))
+    ny = int(np.ceil(N/nx))
+    x_lin = np.linspace(wall_x[0]+L/2, wall_x[1]-L/2, nx)
+    y_lin = np.linspace(wall_y[0]+L/2, wall_y[1]-L/2, ny)
+    positions = []
+    angles = []
+    for x in x_lin:
+        for y in y_lin:
+            if len(positions) >= N:
+                break
+            pos = np.array([x + np.random.uniform(-0.1*L,0.1*L),
+                            y + np.random.uniform(-0.1*L,0.1*L)])
+            positions.append(pos)
+            angles.append(np.random.uniform(0, 2*np.pi))
+    return np.array(positions), np.array(angles)
+
+positions, angles = initialize_rods_grid(N, L, wall_x, wall_y)
+
+# -----------------------------
+# Helper functions
+# -----------------------------
+def reflect_wall(i):
+    x, y = positions[i]
+    if x < wall_x[0]: positions[i,0] = wall_x[0] + (wall_x[0]-x)
+    if x > wall_x[1]: positions[i,0] = wall_x[1] - (x-wall_x[1])
+    if y < wall_y[0]: positions[i,1] = wall_y[0] + (wall_y[0]-y)
+    if y > wall_y[1]: positions[i,1] = wall_y[1] - (y-wall_y[1])
+
+def dipole_vector(i):
+    return mu * np.array([np.cos(angles[i]), np.sin(angles[i])])
+
+def build_cells():
+    nx = int((wall_x[1]-wall_x[0])/cell_size) + 1
+    ny = int((wall_y[1]-wall_y[0])/cell_size) + 1
+    cells = [[[] for _ in range(ny)] for _ in range(nx)]
+    for idx, pos in enumerate(positions):
+        cx = int((pos[0]-wall_x[0])/cell_size)
+        cy = int((pos[1]-wall_y[0])/cell_size)
+        cells[cx][cy].append(idx)
+    return cells, nx, ny
+
+def dipole_energy(i, cells, nx, ny):
+    cx = int((positions[i,0]-wall_x[0])/cell_size)
+    cy = int((positions[i,1]-wall_y[0])/cell_size)
+    U = 0.0
+    mu_i = dipole_vector(i)
+    for dx in [-1,0,1]:
+        for dy in [-1,0,1]:
+            cx2 = cx + dx
+            cy2 = cy + dy
+            if 0 <= cx2 < nx and 0 <= cy2 < ny:
+                for j in cells[cx2][cy2]:
+                    if j != i:
+                        r = positions[j]-positions[i]
+                        dist = np.linalg.norm(r)
+                        if dist < cutoff:
+                            r_hat = r/dist
+                            mu_j = dipole_vector(j)
+                            U += (np.dot(mu_i, mu_j) - 3*np.dot(mu_i,r_hat)*np.dot(mu_j,r_hat))/dist**3
+    return U
+
+def overlaps_any(i, cells, nx, ny):
+    cx = int((positions[i,0]-wall_x[0])/cell_size)
+    cy = int((positions[i,1]-wall_y[0])/cell_size)
+    for dx in [-1,0,1]:
+        for dy in [-1,0,1]:
+            cx2 = cx + dx
+            cy2 = cy + dy
+            if 0 <= cx2 < nx and 0 <= cy2 < ny:
+                for j in cells[cx2][cy2]:
+                    if j != i:
+                        r = positions[j]-positions[i]
+                        if np.linalg.norm(r) < 0.9*L:
+                            return True
+    return False
+
+def nematic_order(angles):
+    Q = np.zeros((2,2))
+    for ang in angles:
+        n = np.array([np.cos(ang), np.sin(ang)])
+        Q += np.outer(n,n)
+    Q /= N
+    Q -= 0.5*np.eye(2)
+    eigvals = np.linalg.eigvals(Q)
+    S = 2*max(eigvals)
+    return S
+
+# -----------------------------
+# Live plotting setup
+# -----------------------------
+fig, (ax1, ax2) = plt.subplots(1,2, figsize=(12,6))
+S_list = []
+frame_list = []
+
+# -----------------------------
+# Main simulation loop with movie recording
+# -----------------------------
+with writer.saving(fig, save_filename, dpi=100):
+    for frame in range(int(steps/50)):
+        cells, nx, ny = build_cells()
+        for _ in range(50):  # 50 MC steps per frame
+            i = np.random.randint(N)
+            old_pos = positions[i].copy()
+            old_ang = angles[i]
+            positions[i] += (np.random.rand(2)-0.5)*move_step
+            angles[i] += (np.random.rand()-0.5)*rot_step
+            reflect_wall(i)
+            if overlaps_any(i, cells, nx, ny):
+                positions[i] = old_pos
+                angles[i] = old_ang
+            else:
+                U_old = dipole_energy(i, cells, nx, ny)
+                U_new = dipole_energy(i, cells, nx, ny)
+                dU = U_new - U_old
+                if dU > 0 and np.random.rand() > np.exp(-dU/kT):
+                    positions[i] = old_pos
+                    angles[i] = old_ang
+
+        # --- rods + dipoles subplot ---
+        ax1.clear()
+        ax1.set_xlim(wall_x)
+        ax1.set_ylim(wall_y)
+        for pos, ang in zip(positions, angles):
+            dx = 0.5*L*np.cos(ang)
+            dy = 0.5*L*np.sin(ang)
+            ax1.plot([pos[0]-dx,pos[0]+dx],[pos[1]-dy,pos[1]+dy],'b',lw=2)
+            ax1.arrow(pos[0], pos[1], 0.3*dx, 0.3*dy, head_width=0.2, head_length=0.2, fc='r', ec='r')
+        ax1.set_title('Rods + Dipoles')
+
+        # --- S vs frame subplot ---
+        S = nematic_order(angles)
+        S_list.append(S)
+        frame_list.append(frame)
+        ax2.clear()
+        ax2.plot(frame_list, S_list, 'b-')
+        ax2.set_xlim(0, steps/50)
+        ax2.set_ylim(0,1)
+        ax2.set_xlabel('Frame')
+        ax2.set_ylabel('Nematic Order S')
+        ax2.set_title('Nematic Order Evolution')
+        ax2.grid(True)
+
+        plt.pause(0.001)  # live plot
+
+        # record frame
+        writer.grab_frame()
+
+plt.show()
+print(f"Simulation complete, movie saved as '{save_filename}'")
