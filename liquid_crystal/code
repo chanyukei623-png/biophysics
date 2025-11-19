@@ -8,18 +8,18 @@ import shutil
 # -----------------------------
 N = 200           # number of rods
 L = 1.0           # rod length
-mu = 1.0          # dipole magnitude
+mu = 1.0          # dipole moment
 kT = 1.0
-steps = 5000      # total MC steps
-move_step = 0.1
+steps = 5000
+move_step = 1
 rot_step = 0.1
-wall_x = (0, 50)
-wall_y = (0, 50)
+wall_x = (0, 20)
+wall_y = (0, 20)
 cutoff = 5.0
 cell_size = 3.0
 
 # -----------------------------
-# Output movie
+# Movie writer setup
 # -----------------------------
 if shutil.which("ffmpeg"):
     writer = animation.FFMpegWriter(fps=20)
@@ -29,7 +29,7 @@ else:
     save_filename = "nematic_simulation.gif"
 
 # -----------------------------
-# Initialize rods on grid to avoid overlap
+# Initialize rods on grid (no overlaps)
 # -----------------------------
 def initialize_rods_grid(N, L, wall_x, wall_y):
     nx = int(np.ceil(np.sqrt(N*(wall_x[1]-wall_x[0])/(wall_y[1]-wall_y[0]))))
@@ -120,14 +120,38 @@ def nematic_order(angles):
     return S
 
 # -----------------------------
-# Live plotting setup
+# Setup live plotting
 # -----------------------------
 fig, (ax1, ax2) = plt.subplots(1,2, figsize=(12,6))
+ax1.set_xlim(wall_x[0]-L, wall_x[1]+L)
+ax1.set_ylim(wall_y[0]-L, wall_y[1]+L)
+ax1.set_aspect('equal')
+ax1.set_title('Rods + Dipoles')
+
+ax2.set_xlim(0, steps/50)
+ax2.set_ylim(0,1)
+ax2.set_xlabel('Frame')
+ax2.set_ylabel('Nematic Order S')
+ax2.set_title('Nematic Order Evolution')
+ax2.grid(True)
+
+# Pre-create rod lines and arrow patches
+rod_lines = []
+arrow_patches = []
+
+for pos, ang in zip(positions, angles):
+    dx = 0.5*L*np.cos(ang)
+    dy = 0.5*L*np.sin(ang)
+    line, = ax1.plot([pos[0]-dx, pos[0]+dx], [pos[1]-dy, pos[1]+dy], 'b', lw=2)
+    rod_lines.append(line)
+    arrow = ax1.arrow(pos[0], pos[1], 0.3*dx, 0.3*dy, head_width=0.2, head_length=0.2, fc='r', ec='r')
+    arrow_patches.append(arrow)
+
 S_list = []
 frame_list = []
 
 # -----------------------------
-# Main simulation loop with movie recording
+# Main simulation with live GIF
 # -----------------------------
 with writer.saving(fig, save_filename, dpi=100):
     for frame in range(int(steps/50)):
@@ -150,18 +174,18 @@ with writer.saving(fig, save_filename, dpi=100):
                     positions[i] = old_pos
                     angles[i] = old_ang
 
-        # --- rods + dipoles subplot ---
-        ax1.clear()
-        ax1.set_xlim(wall_x)
-        ax1.set_ylim(wall_y)
-        for pos, ang in zip(positions, angles):
-            dx = 0.5*L*np.cos(ang)
-            dy = 0.5*L*np.sin(ang)
-            ax1.plot([pos[0]-dx,pos[0]+dx],[pos[1]-dy,pos[1]+dy],'b',lw=2)
-            ax1.arrow(pos[0], pos[1], 0.3*dx, 0.3*dy, head_width=0.2, head_length=0.2, fc='r', ec='r')
-        ax1.set_title('Rods + Dipoles')
+        # --- Update rods + dipoles ---
+        for i, line in enumerate(rod_lines):
+            dx = 0.5*L*np.cos(angles[i])
+            dy = 0.5*L*np.sin(angles[i])
+            line.set_data([positions[i,0]-dx, positions[i,0]+dx],
+                          [positions[i,1]-dy, positions[i,1]+dy])
+            # remove old arrow and create a new one
+            arrow_patches[i].remove()
+            arrow_patches[i] = ax1.arrow(positions[i,0], positions[i,1], 0.3*dx, 0.3*dy,
+                                         head_width=0.2, head_length=0.2, fc='r', ec='r')
 
-        # --- S vs frame subplot ---
+        # --- Update nematic order plot ---
         S = nematic_order(angles)
         S_list.append(S)
         frame_list.append(frame)
@@ -174,9 +198,7 @@ with writer.saving(fig, save_filename, dpi=100):
         ax2.set_title('Nematic Order Evolution')
         ax2.grid(True)
 
-        plt.pause(0.001)  # live plot
-
-        # record frame
+        plt.pause(0.001)
         writer.grab_frame()
 
 plt.show()
